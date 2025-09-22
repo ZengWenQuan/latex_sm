@@ -1,0 +1,87 @@
+\section{模型假设与符号说明}
+\subsection{模型的假设}
+\begin{assumption}
+	\label{asm:1}
+	数据中包括的三个AP均处在同一信道中，即属于同频AP，节点之间发送数据会造成相互干扰与影响且属于同频干扰；
+\end{assumption}
+
+\begin{assumption}
+	\label{asm:2}
+	假设在场景中AP或STA接受数据时收到的环境底噪较小，忽略不计，干扰均来自于其他AP或STA传输的数据；
+\end{assumption}
+
+\begin{assumption}
+	\label{asm:3}
+	假设TCP协议在本题中不考虑三次握手和四次挥手建立连接过程，即只考虑数据传输过程；
+\end{assumption}
+
+\begin{assumption}
+	\label{asm:4}
+	假设在场景中只存在同频干扰，不存在异频干扰，且相邻AP不进行通信。
+\end{assumption}
+
+\subsection{主要符号说明}
+\subsubsection{缩略字母说明，其他缩略字母请见正文部分}
+
+\begin{table}[H]
+	\centering
+	\caption{缩略字母说明}
+	\begin{tabular}{p{2.0cm}<{\centering}p{8.0cm}<{\centering}p{4.0cm}<{\centering}}
+		%指定单元格宽度， 并且水平居中。
+		\hline
+		缩略字母 & 全称 & 中文含义  \\ %换行 
+		\hline
+		$AP$ & Access Point & 无线接入点   \\ %把你的符号写在这
+		STA	& Station	& 站点\\
+		
+		RSSI &	Received Signal Strength Indication	& 接收信号能量强度\\
+		
+		WLAN &	Wireless Local Area Network	& 无线局域网\\
+		
+		CCA &	Clear Channel Assessment	& 信道可用评估\\
+		
+		PD &	Packet Detection	& 包检测门限\\
+		
+		ED &	Energy Detection	& 能量检测门限\\
+		
+		NAV	 & Network Allocator Vector	& 网络分配矢量\\
+		
+		SINR &	Signal To Interference And Noise Ratio	& 信干噪比\\
+		
+		MCS &	Modulation and Coding Scheme	& 调制编码方案\\
+		
+		NSS &	Number of Spatial Stream	& 空间流数\\
+		
+		BSS &	Basic Service Set	& 基本服务集\\
+		
+		\hline
+	\end{tabular}
+\end{table}
+
+\subsubsection{参数符号说明}
+\begin{longtable}{ c c c }
+	\caption{参数符号说明} \\ % 表格标题
+	%指定单元格宽度， 并且水平居中。
+	\hline
+	符号 & 含义   \\ %换行 
+	\hline
+	
+	$d$	& 接收信号的距离\\
+	$d_0$ &	接收信号的及基准距离\\
+	$ \lambda $	& 路径动态衰减参数\\
+	$X_{\theta}$ &	均值为$\sigma$标准差为$\theta$的高斯分布随机函数\\
+	$P_s$ &	数据信号的功率值\\
+	$P_i$ &	干扰信号的功率值\\
+	$P_n$ &	环境底噪的功率值\\
+	$RSSI_s$ &	数据信号的接收信号强度\\
+	$RSSI_i$ &	干扰信号的接收信号强度\\
+	$NAV_i$ &	当前信道i的NAV门限值\\
+	$v_i$ &	第i个数据的剩余误差\\
+	$ \alpha $ &	同步传输强度占混合传输强度的比例\\
+	$\beta_1$ &	信号强度处于PD和ED门限之间的信号中携带preamble前导头的概率\\
+	$\beta_2$ &	信号强度超过ED门限的信号中能被准确识别的判断信道繁忙的概率\\
+	$C_{HN}$ &	奈奎斯特信道传输速率\\
+	$C_{CS}$ &	香农信道传输速率\\
+	
+	\hline
+\end{longtable}
