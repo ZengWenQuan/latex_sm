@@ -1,248 +1,206 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{ctex}
+\geometry{left=3cm,right=3cm,top=2.5cm,bottom=2.5cm}
+
+\newtheorem{theorem}{定理}
+\newtheorem{lemma}{引理}
+\newtheorem{definition}{定义}
+\newtheorem{claim}{主张}
+
+\title{问题一：分析与求解}
+\author{（作者）}
+\date{}
+
+\begin{document}
+\maketitle
+
 \section{问题一分析与求解}
-\subsection{相关性分析}\label{问题一分析}
 
-本节首先使用Pearson correlation，初步分析各参数对AP发送机会（seq\_time）的影响，为预测模型做准备。（数据来源：第4节预处理后的训练集）。
+\subsection{问题一建模与复杂性分析}
+\label{subsec:problem1_analysis}
 
+问题一要求在忽略硬件缓存容量物理限制（即假设L1与UB缓存无限）的前提下，为给定的有向无环图（DAG）计算图生成一个满足拓扑约束的节点调度序列，使得执行过程中L1与UB缓存的峰值占用量最小化。同时，需满足L0级缓存（L0A、L0B、L0C）的互斥约束：任意时刻，每类L0缓存至多仅允许一个缓冲区驻留。
 
-\begin{equation}
-	\small
-	\rho_{X, Y} = \frac{\operatorname{cov}(X, Y)}{\sigma_{X} \sigma_{Y}} = \frac{E(X Y) - E(X) E(Y)}{\sqrt{E(X^{2}) - E^{2}(X)} \sqrt{E(Y^{2}) - E^{2}(Y)}}
-\end{equation}
+该问题可抽象为一个带资源约束的拓拓扑排序优化问题，其目标函数为调度序列执行过程中的最大瞬时缓存占用量。我们首先通过归约方法证明该问题是NP难的，继而提出一种基于贪心策略与反向拓扑传播优先级评估的启发式调度算法，以在多项式时间内获得高质量近似解。
 
+\subsubsection{最小峰值内存调度问题（Minimum Peak Memory Scheduling Problem）}
+\label{subsubsec:min_peak_problem}
 
-% TODO: \usepackage{graphicx} required
-\begin{figure}[H]
-	\centering
-	\includegraphics[width=1\linewidth]{figures/问题一热力图}
-	\caption{参数相关性热力图}
-	\label{fig:}
-\end{figure}
+最小峰值内存调度问题（MPMSP）是调度理论中的经典NP难问题，其定义如下：
 
+\begin{definition}[最小峰值内存调度问题]
+给定一个DAG $ G = (V, E) $，其中每个节点 $ v \in V $ 关联一个内存需求 $ s(v) \in \mathbb{N}^+ $（若为ALLOC节点）或内存释放量 $ -s(v) $（若为FREE节点），目标是寻找一个拓扑排序 $ \pi: V \to \{1, 2, \dots, |V|\} $，使得执行序列中任意时刻的累计内存占用量最大值最小化：
+\[
+\min_{\pi \in \text{Topo}(G)} \max_{1 \leq k \leq |V|} \left| \sum_{i=1}^{k} \Delta m(\pi(i)) \right|
+\]
+其中 $ \Delta m(v) = \begin{cases} 
++s(v) & \text{if } v \text{ is ALLOC} \\
+-s(v) & \text{if } v \text{ is FREE}
+\end{cases} $，且 $ \text{Topo}(G) $ 表示所有满足DAG拓扑序的排列集合。
+\end{definition}
 
-如图所示，本节分析了在2AP和3AP训练集中，各参数与目标变量seq\_time之间的相关性。通过计算相关性，能够识别出对seq\_time影响显著的特征，并对其影响强弱进行排序。如表5.4所示。
+MPMSP已被广泛研究，并被证明是强NP难的\cite{Liu2017Memory}。其难点在于节点调度顺序直接影响内存生命周期重叠程度，而最优调度需全局协调所有资源分配与释放时机。
 
-\begin{longtable}{ccc}
-	\caption{seq\_time影响强弱相关性（部分）}\\
-	\hline
-	\textbf{变量名} & \textbf{2AP} & \textbf{3AP} \\ 
-	\hline
-	throughput                          & 0.467841      & 0.660084      \\
-	MCS                                & -0.353371     & -0.314458     \\
-	per                                & -0.384524     & -0.385909     \\
-	sta\_from\_ap\_signal\_max\_free\_rate & -0.430447     & -            \\
-	sta\_to\_ap\_noise\_mean\_free\_rate & -0.513676     & -            \\
-	sta\_from\_ap\_noise\_max\_free\_rate  & -0.528735     & -0.400428     \\
-	sta\_to\_ap\_noise                    & -0.543609     & -0.404161     \\
-	sta\_from\_ap\_noise                  & -0.558357     & -0.374620     \\
-	sta\_from\_ap\_signal                 & -0.570747     & -            \\
-	sta\_from\_ap\_noise\_mean\_free\_rate & -0.572061     & -0.396948     \\
-	ap\_from\_other\_ap\_sum\_rssi\_noise & -0.761089     & -            \\
-	eirp                               & -0.774949     & -0.585820     \\
-	ap\_from\_other\_ap\_max\_rssi\_noise & -0.826892     & -0.634508     \\
-	ap\_from\_other\_ap\_mean\_rssi\_noise & -0.912509     & -0.666785     \\ 
-	\hline
-\end{longtable}
+\subsubsection{问题一的NP难性证明}
+\label{subsubsec:reduction}
 
-1. 强影响因素：throughput在两类训练集下均为最高的正相关；多个变量（如 MCS、per 和 eirp）对seq\_time的影响均显著，表明了它们在预测seq\_time的重要性。
+为证明本题的NP难性，我们构造一个从MPMSP到本问题的多项式时间归约。
 
-2. 负相关因素：eirp 和 RSSI 相关的变量均表现出较大的负相关；
+\begin{theorem}
+问题一（最小缓存驻留调度）是NP难的。
+\end{theorem}
 
-3. 共性：在对2AP和3AP训练集的比较中，我们发现参数与seq\_time之间的关系呈现出一些共性，主要表现在以下几个方面：
+\begin{proof}
+设存在一个MPMSP实例 $ I = (G, s) $，其中 $ G = (V, E) $ 为DAG，$ s: V \to \mathbb{N}^+ $ 为内存需求函数。我们构造一个对应的本问题实例 $ I' $ 如下：
 
 \begin{itemize}
-	\item 多数与RSSI相关的参数（如 ap\_from\_other\_ap\_mean\_rssi\_noise ）在两个训练集中均表现出较高的负相关性。这表明信号的噪声和质量对发送数据帧序列的总时长（seq\_time）具有重要影响。
-	\item 除RSSI相关参数外，eirp（AP的发送功率）在两个训练集中显示出显著的负相关性。
+    \item 对每个节点 $ v \in V $，在 $ I' $ 中创建两个节点：一个ALLOC节点 $ a_v $ 和一个FREE节点 $ f_v $。
+    \item 设置 $ a_v.\text{BufId} = f_v.\text{BufId} = v $，$ a_v.\text{Size} = f_v.\text{Size} = s(v) $，且缓存类型均为UB。
+    \item 对 $ G $ 中的每条边 $ (u, v) \in E $，在 $ I' $ 中添加一条依赖边 $ (f_u, a_v) $。
+    \item 对每个节点 $ v \in V $，在 $ I' $ 中添加一条依赖边 $ (a_v, f_v) $。
 \end{itemize}
+该构造可在多项式时间内完成。在此构造下，$ I' $ 的调度问题与 $ I $ 的MPMSP问题等价。由于L0互斥约束在本构造中未被激活，因此 $ I' $ 的最优解对应于 $ I $ 的最优解。鉴于MPMSP是NP难的，故本问题也是NP难的。
+\end{proof}
 
+\subsection{基于贪心策略的启发式调度算法}
+\label{subsec:heuristic_algorithm}
+由于问题一的NP难特性，我们设计了一种高效的启发式算法，旨在多项式时间内生成高质量的近似解。该算法的核心思想是采用一种贪心策略，通过为所有无前驱依赖的ALLOC根节点计算优先级分数，从而确定一个优化的初始调度序列。其设计原则总结如下：
+\begin{enumerate}[noitemsep]
+  \item 保证产生的序列满足 DAG 的拓扑约束（即任何时刻只能选择所有前驱已调度的“就绪”节点进行调度）。
+  \item 就绪节点之间采用分层优先级：优先调度能释放大量空间的 \(\mathrm{FREE}\) 节点，其次为普通操作节点（\(\mathrm{OP}\)），最后考虑 \(\mathrm{ALLOC}\) 节点，从而尽可能在早期降低当前驻留内存。
+  \item 对 \(\mathrm{ALLOC}\) 节点采用精细化优先级：优先调度能最快降低未来内存压力的\(\mathrm{ALLOC}\) 节点。这一决策基于一个反向拓扑传播的评分模型，该模型从图的叶子节点（\(\mathrm{FREE}\)节点）出发，将未来可释放的内存量作为“收益”反向拓扑传播至图的根节点（\(\mathrm{ALLOC}\) 节点）。
+  \item 在 L0 类型（L0A/L0B/L0C）互斥约束下，采用计数器维护当前已分配 L0 类型资源并对待调度的 \(\mathrm{ALLOC}\) 节点进行阻塞与快速唤醒（使用双指针以实现批量或连续唤醒的低开销）。
+\end{enumerate}
 
-4.结论：尽管与RSSI相关的参数在影响seq\_time方面表现出一定的相关性，然而这些参数不足以支持训练高效的seq\_time预测模型，主要原因在于：
-
+\subsubsection{针对L0互斥约束的优先级策略}
+为了处理L0缓存的互斥约束，算法首先将所有ALLOC根节点划分为两个独立的优先级组：
 \begin{itemize}
-	\item RSSI作为信号强度的度量，其值可能会受到环境干扰的极大影响，导致其对于模型学习的可预测性差。
-	\item 相关性虽然显示出一定的影响，但并不能直接作为因果关系的依据。高相关性不一定意味着高因果解释力。
-	\item 训练集中，与RSSI相关的参数多达20条及以上，数据维度过高可能导致过拟合及计算效率低下。
+    \item \textbf{L0组 ($R_{L0}$)}：所有在L0A, L0B, L0C缓存上分配空间的ALLOC节点。
+    \item \textbf{非L0组 ($R_{\neg L0}$)}：所有在L1, UB等其他缓存上分配空间的ALLOC节点。
+\end{itemize}
+初始阶段时认为L0组的节点拥有绝对优先级，即所有L0组的节点必须在任何非L0组的节点之前被调度。这一策略旨在尽早处理具有严格互斥约束的L0资源，以最大程度地降低因资源竞争而引发死锁的可能性。
+
+\subsubsection{组内优先级评估模型}
+在每个优先级组内部，节点的相对顺序由一个精细的评分系统决定。我们设计了两个独立的分数，$S_1$和$S_2$，分别用于$R_{\neg L0}$组和$R_{L0}$组的内部排序。
+
+\paragraph{Score1 ($S_1$)：非L0组的优先级分数}
+$S_1$分数旨在量化一个ALLOC节点在未来能够“解锁”的内存释放总量。
+\begin{itemize}
+    \item \textbf{分数初始化}：对于图中的每个叶子节点（FREE节点）$l$，其初始分数$S_1(l)$定义为其释放的内存大小的负值。为了激励尽早释放L0缓存，我们引入权重$\omega_{L0} > 1$（本研究中取$\omega_{L0}=3$）。
+    \[
+    S_1(l) = \begin{cases} 
+    -\omega_{L0} \cdot \text{size}(l) & \text{if } l \text{ frees an L0 buffer} \\
+    -\text{size}(l) & \text{otherwise}
+    \end{cases}
+    \]
+    \item \textbf{分数传播}：分数从叶子节点沿反向拓扑序向其父节点传播。对于一个节点$v$，其分数$S_1(v)$会累加到其所有直接父节点$p \in \text{Parents}(v)$上。
+    \[
+    S_1(p) \leftarrow S_1(p) + \alpha_1 \cdot S_1(v)
+    \]
+    其中，传播因子$\alpha_1=1$。最终，每个根节点$r$的$S_1(r)$值表示其所有下游路径可释放的内存总量的加权和。$S_1$值越小（即负得越多），表示其下游可释放的内存越多，优先级越高。
 \end{itemize}
 
-因此，有必要针对 RSSI 的相关参数进行进一步的提取和选择，并重新对RSSI进行特征构建，以提高预测模型的学习特征能力，通过计算和引入更具解释性的特征来增强模型的表达能力，将对模型的有效性和可预测性有积极影响。
+\paragraph{Score2 ($S_2$)：L0组的优先级分数}
+$S_2$分数的设计目标是评估一个L0 ALLOC节点下游的拓扑结构复杂度，优先处理分支较多的节点以避免死锁。
+\begin{itemize}
+    \item \textbf{分数初始化}：$S_2$的计算忽略L0缓存的释放量，仅关注拓扑结构。
+    \[
+    S_2(l) = \begin{cases} 
+    0 & \text{if } l \text{ frees an L0 buffer} \\
+    -\text{size}(l) & \text{otherwise}
+    \end{cases}
+    \]
+    \item \textbf{分数传播}：传播规则为：
+    \[
+    S_2(p) \leftarrow S_2(p) + (1 + \alpha_2 \cdot S_2(v))
+    \]
+    其中，传播因子$\alpha_2$通常是一个较小值，这意味着，首先根据分支 $\alpha_2 \cdot S_2(v)$项仅在两个ALLOC节点分支数量相近的情况下才起主要作用。公式简化为$S_2(p) \leftarrow S_2(p) + 1$。这意味着，一个节点的$S_2$分数近似等于其下游的路径分支数量。$S_2$值越大，代表其下游拓扑结构越复杂。
+\end{itemize}
 
+\subsubsection{最终调度序列生成}
+获得原始分数后，我们通过归一化和加权求和来计算每个根节点的最终总分。
+\begin{enumerate}
+    \item \textbf{分数归一化}：对所有根节点$r \in R = R_{L0} \cup R_{\neg L0}$，分别对$S_1(r), S_2(r)$以及节点申请的内存大小$\text{size}(r)$进行最小-最大归一化，映射到$[0, 1]$区间。
+    \[
+    \text{norm}(x) = \frac{x - \min(X)}{\max(X) - \min(X)}
+    \]
+    \item \textbf{总分计算}：
+    \begin{align*}
+    S_{\text{total},1}(r) &= \text{norm}(S_1(r)) + w_{\text{size}} \cdot \text{norm}(\text{size}(r)) \quad (\text{for } r \in R_{\neg L0}) \\
+    S_{\text{total},2}(r) &= \text{norm}(S_2(r)) + w_{\text{size}} \cdot \text{norm}(\text{size}(r)) \quad (\text{for } r \in R_{L0})
+    \end{align*}
+    其中$w_{\text{size}}$是一个极小的权重（本研究中取$10^{-10}$），使得节点大小仅作为次要的排序依据。
+    \item \textbf{排序与合并}：
+    \begin{itemize}
+        \item $R_{\neg L0}$组根据$S_{\text{total},1}$升序排序。
+        \item $R_{L0}$组根据$S_{\text{total},2}$升序排序。
+    \end{itemize}
+    最终的根节点调度序列$\pi_{\text{root}}$由排序后的$R_{L0}$组和$R_{\neg L0}$组顺序拼接而成。
+\end{enumerate}
 
-\subsection{特征构建}
+\subsubsection{算法伪代码与复杂度分析}
+算法的整体流程如算法\ref{alg:schedule}所示。
 
+\begin{algorithm}
+\caption{启发式调度算法}
+\label{alg:schedule}
+\begin{algorithmic}[1]
+\STATE \textbf{Input:} 有向无环图 $G=(V, E)$
+\STATE \textbf{Output:} 根节点调度序列 $\pi_{\text{root}}$
 
-\subsubsection{信干噪比}
+\FUNCTION{CalculateScore}{$G$, score\_type}
+    \STATE 初始化所有节点的score为0
+    \STATE $Q \leftarrow$ 图$G$中所有出度为0的节点（叶子节点）
+    \FOR{$l$ in $Q$}
+        \IF{score\_type is 1}
+            \STATE 根据$S_1$规则初始化$l.score$
+        \ELSE
+            \STATE 根据$S_2$规则初始化$l.score$
+        \ENDIF
+    \ENDFOR
+    \WHILE{$Q$ is not empty}
+        \STATE $v \leftarrow Q.popleft()$
+        \FOR{$p$ in Parents($v$)}
+            \IF{score\_type is 1}
+                \STATE $p.score \leftarrow p.score + \alpha_1 \cdot v.score$
+            \ELSE
+                \STATE $p.score \leftarrow p.score + (1 + \alpha_2 \cdot v.score)$
+            \ENDIF
+            \STATE $p.out\_degree \leftarrow p.out\_degree - 1$
+            \IF{$p.out\_degree = 0$}
+                \STATE $Q.append(p)$
+            \ENDIF
+        \ENDFOR
+    \ENDWHILE
+\ENDFUNCTION
 
-在传输过程中，信干燥比SINR可以代表着信号中所承载有效信息的比例，参考（4.1）
+\STATE
+\STATE // 主流程
+\STATE $S_1 \leftarrow$ CalculateScore($G$, 1)
+\STATE $S_2 \leftarrow$ CalculateScore($G$, 2)
+\STATE $R \leftarrow$ 图$G$中所有入度为0的ALLOC节点（根节点）
+\STATE $R_{L0} \leftarrow \{r \in R \mid r.\text{type} \in \{\'L0A\', \'L0B\', \'L0C\'\}\}$
+\STATE $R_{\neg L0} \leftarrow R \setminus R_{L0}$
+\STATE 对$R$中节点的$S_1, S_2, \text{size}$进行归一化
+\STATE 为$R_{L0}$中每个节点计算$S_{\text{total},2}$
+\STATE 为$R_{\neg L0}$中每个节点计算$S_{\text{total},1}$
+\STATE Sort $R_{L0}$ in ascending order of $S_{\text{total},2}$
+\STATE Sort $R_{\neg L0}$ in ascending order of $S_{\text{total},1}$
+\STATE $\pi_{\text{root}} \leftarrow \text{concatenate}(R_{L0}, R_{\neg L0})$
+\STATE \textbf{return} $\pi_{	ext{root}}$
+\end{algorithmic}
+\end{algorithm}
 
+\paragraph{复杂度分析}
+该算法的主要计算开销在于分数计算过程。`CalculateScore`函数本质上是对图进行一次反向拓扑遍历，其时间复杂度为$O(|V| + |E|)$，其中$|V|$是节点数，$|E|$是边数。该过程执行两次。后续的根节点分组、归一化和排序步骤的时间复杂度为$O(|R|\log|R|)$，其中$|R|$是根节点的数量。由于$|R| \leq |V|$，算法的整体时间复杂度由图遍历主导，为$O(|V| + |E|)$，能够在多项式时间内为大规模计算图生成高质量的调度序列。
 
-
-在公式中，由于训练集没有收集到信号或是干扰与噪声的功率大小，而RSSI一般以dBm（分贝毫瓦）表示，是接收端感知的信号强度。因此，实际上已经是信号功率的一个直接度量，所以本文在计算SINR时，由于RSSI是以功率的对数为基准的数量关系，故本文利用RSSI之间的差值来近似表示SINR。公式如下：
-
-
-\begin{equation}
-	RSSI_i-RSSI_j\lg \left( P_i \right) -\lg \left( P_j \right) =\lg \left( \frac{P_i}{P_j} \right) \frac{P_i}{P_j}
-\end{equation}
-
-由题可知，计算SINR的情况分为三种，故需要通过数据中AP与AP之间、AP与STA之间，STA与STA之间传输的RSSI数值大小来区分此次传输属于同步传输、异步传输还是混合传输。
-
-\begin{table}[H]
-	\centering
-	\caption{不同传输形式下的RSSI监听情况}
-	\begin{tabular}{@{}cccccc@{}} % 修改列数为6
-		\toprule
-		\textbf{类别序号} & \textbf{\shortstack{AP与AP \\ 监听RSSI}} & \textbf{\shortstack{关联AP与STA \\ 监听RSSI}} & \textbf{\shortstack{邻区AP与STA \\ 监听RSSI}} & \textbf{\shortstack{STA与STA \\ 监听RSSI}} & \textbf{传输形式} \\ \midrule
-		1 & 较低 & 较高 & 较低 & 较低 & 同步传输 \\
-		2 & 较低 & 较高 & 较高 & 较低 & 异步传输 \\
-		3 & 时高时低 & 较高 & 时高时低 & 较低 & 混合传输 \\ \bottomrule
-	\end{tabular}
-\end{table}
-
-然后通过判断不同的传输类型，可以进一步将公式（5.14）细化为：
- 
-
-\begin{equation}
-	\left\{ 
-	\begin{array}{l}
-		\begin{matrix}
-			SINR_{ST} \approx RSSI_{APtoSTA} - RSSI_N & \text{，} \text{同步传输} \\
-		\end{matrix} \\[1ex]
-		\begin{matrix}
-			SINR_{AT} \approx RSSI_{APtoSTA} - RSSI_{neiborAPtoSTA} & \text{，} \text{异步传输} \\
-		\end{matrix} \\[1ex]
-		\begin{matrix}
-			SINR_{MT} \approx \alpha \cdot SINR_{ST} + \left( 1 - \alpha \right) SINR_{AT} & \text{，} \text{混合传输} \\
-		\end{matrix} \\
-	\end{array} 
-	\right.
-\end{equation}
-
-
-由此可以通过监听四类RSSI（sum列）来构建新的特征值SINR。
-
-同时对于其他RSSI（max列和mean列）根据题中所提出的利用RSSI的最大值对CCA门限（PD门限与ED门限）做比较来判断数据在传输过程中是否能够正常发送并接收，利用RSSI的均值来与NAV门限做比较来判断是否要进行信道占用。所以利用这两列对不同要求门限的数值进行比较，算出其max列与mean列的信道通过率大小作为新特征值，其中CCA门限较为复杂，对于一个单元个中的数据列表中所有RSSI数值，如果小于PD门限则表示信号较弱，不能接收，若处于PD与ED门限之间，则认为它有$\beta_1$的概率携带PHY的preamble前导序列头，则端口识别为同频下的信号，这时候需要对PD门限进行比较，但他的RSSI处在PD和ED之间，则故有$\beta_1$的概率可以判断为信道繁忙，则代表信号不会收到新的数据传输干扰，同理在超过ED门限的RSSI中，有$\beta_2$的概率可以正确识别判断为信号传输判断信道繁忙，则也会成功通过信道传输。
-
-
-
-\subsubsection{信号质量}
-
-
-
-信号质量通常通过接收到的信号强度来衡量。因此，RSSI 值越高，表示信号质量越好。为了综合考虑来自不同 AP 的信号质量。本文对于STA端口，在收到AP的信号后，不论是两个AP的基本服务集还是三个AP的基本服务集，对STA收到的AP端口的信号进行加权平均处理，使用公式（4.7）计算得到一个综合的信号质量指标。
-
-
-
-
-\subsection{模型建立与求解}
-
-针对问题一，本文采用Stacking集成学习模型，将梯度提升学习算法，随机森林，支持向量回归以及线性回归四类算法结合起来。原因如下：
-
-1.本题的训练集特征维度高，单一模型无法充分捕捉数据中的复杂关系。
-
-2.训练集具有复杂性和多样性，单一模型无法有效捕捉所有的数据特征。
-
-3.训练集样本有限，简单模型会导致高偏差，而复杂模型会造成过拟合。
-
-4.Stacking的主要目的是提高模型的准确性和鲁棒性，特别适用于本题对准确性要求极高的场景
-
-
-% TODO: \usepackage{graphicx} required
-\begin{figure}[H]
-	\centering
-	\includegraphics[width=0.7\linewidth]{figures/stacking}
-	\caption{Stacking集成学习流程图}
-	\label{fig:Stacking集成学习流程图}
-\end{figure}
-
-如图5.6所示，本文先将训练集放入多个基学习器中进行训练，将第一次预测的值以及训练集的目标值作为输入与输出进行数据的二测重构，放入元学习器中进行训练；测试集的特征值让四个基学习器中预测的值作为元学习器的输入值进行预测，得到的最终结果即为stacking集成学习最终的预测结果。训练使用的特征值如下表所示。
-
-\begin{table}[H]
-	\centering
-	\caption{特征值（部分）}
-	\begin{tabular}{ccccc} % 
-		\toprule
-		SINR & protocol & signal\_quality &  per & eirp\\ 
-		\midrule
-		 30.064 & 20 & -72.2375 &  0.27 & 13 \\
-		 25 & 20 & -83.975 &  0.15 & 9 \\
-	 	 25 & 8 & -83.975 &  0.14 & 9 \\
-		 25.6628 & 20 & -83.8 &  0.17 & 10 \\
-		\bottomrule
-	\end{tabular}
-\end{table}
-
-使用Python的sklearn库，构建集成学习模型，将数据集按照7:3的比例划分为训练集和测试集，然后使用网格搜索进行超参数优化，以找到性能最佳的模型参数组合，训练出最优模型，结果如下。
-
-
-\begin{table}[H]
-	\centering
-	\caption{模型性能对比}
-	\begin{tabular}{@{}ccccccc@{}}
-		\toprule
-		\multirow{2}{*}{Model} & \multicolumn{2}{c}{2AP} & \multicolumn{2}{c}{3AP} & \multicolumn{2}{c}{AP} \\ 
-		\cmidrule{2-3}
-		\cmidrule{4-5}
-		\cmidrule{6-7}
-		& RMSE & R² & RMSE & R² & RMSE & R² \\ 
-		\midrule
-		梯度提升 & 2.747696 & 0.932200 & 3.269128 & 0.926637 & 7.125881 & 0.682336 \\
-		随机森林 & 2.672078 & 0.935880 & 3.216168 & 0.928995 & 6.781550 & 0.712294 \\
-		支持向量回归 & 3.589683 & 0.884281 & 4.743004 & 0.845575 & 8.301113 & 0.568914 \\
-		线性回归 & 3.099190 & 0.913744 & 4.347454 & 0.870258 & 9.004967 & 0.492711 \\
-		集成学习 & 2.606650 & 0.938982 & 3.102912 & 0.933908 & 6.746497 & 0.715260 \\
-		集成学习（优化参数） & 1.453308 & 0.981033 & 2.757210 & 0.947814 & 6.615275 & 0.726229 \\ 
-		\bottomrule
-	\end{tabular}
-\end{table}
-
-
-
-
-
-
-
-
-
-
-如表5.7所示，本文对AP个数进行分类建模（2AP和3AP），分别训练模型，同时对AP数量统一建模，以比较集成学习模型在不同样本下的模型性能。显然，对AP数量分类后，预测性能最优。经过5重交叉验证和网格搜索调参后，最优的参数组合如下表所示。
-
-\begin{table}[H]
-	\centering
-	\caption{最佳得分和参数设置}
-	\begin{tabular}{cc}
-		\toprule
-		指标 & 最佳值 \\
-		\midrule
-		最佳得分 (Best Score) & 9.77534051567329 \\
-		学习率 (learning\_rate) & 0.3 \\
-		基学习器数量 (n\_estimators) - 梯度提升 & 200 \\
-		最大深度 (max\_depth) - 随机森林 & 5 \\
-		基学习器数量 (n\_estimators) - 随机森林 & 200 \\
-		惩罚参数 (C) - 支持向量回归 & 10 \\
-		核函数 (kernel) - 支持向量回归 & `rbf' \\
-		\bottomrule
-	\end{tabular}
-\end{table}
-
-
-
-
-
-% TODO: \usepackage{graphicx} required
-\begin{figure}[H]
-	\centering
-	\includegraphics[width=0.9\linewidth]{figures/2ap和3ap残差图}
-	\caption{Stacking模型残差分布图}
-	\label{fig:2ap3ap}
-\end{figure}
-
-
-% TODO: \usepackage{graphicx} required
-\begin{figure}[H]
-	\centering
-	\includegraphics[width=0.8\linewidth]{figures/2ap结果}
-	\caption{Stacking模型预测图}
-	\label{fig:2ap}
-\end{figure}
-
-
-
-如图所示，对于2AP预测模型，残差主要分布在[ -2,+2 ]之间，测试集的平均绝对误差（MSE）为1.05，决定系数${R}^{2}$为0.98，模型预测精度较高；对于3AP预测模型，残差主要分布在[ -5,+5 ]之间，测试集的平均绝对误差（MSE）为1.84，决定系数${R}^{2}$为0.95，模型预测精度也较高，可以实现对seq\_time的高精度预测。
+\end{document}
