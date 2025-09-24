@@ -1,8 +1,8 @@
 % !Mode:: "TeX:UTF-8"
 %!TEX program  = xelatex
 
-%\documentclass[bwprint,fontset=windows]{gmcmthesis}
-\documentclass[bwprint]{gmcmthesis}
+\documentclass[bwprint,fontset=windows]{gmcmthesis}
+% \documentclass[bwprint]{gmcmthesis}
 \usepackage{longtable}
 \usepackage{graphicx}
 \usepackage{epstopdf}
@@ -52,18 +52,22 @@
 \definecolor{color3}{rgb}{0.88,0.92,0.96}
 \definecolor{color4}{rgb}{0.96,0.97,0.98}%{0.9176,0.9373,0.9686}
 
+% 旧版的与算法有关的宏包
 % 算法
-\usepackage[noend]{algpseudocode}
-\usepackage{algorithmicx,algorithm}
-\floatname{algorithm}{算法}
-\renewcommand{\algorithmicrequire}{\textbf{输入:}}
-\renewcommand{\algorithmicensure}{\textbf{输出:}}
+% \usepackage[noend]{algpseudocode}
+% \usepackage{algorithmicx,algorithm}
+% \floatname{algorithm}{算法}
+% \renewcommand{\algorithmicrequire}{\textbf{输入:}}
+% \renewcommand{\algorithmicensure}{\textbf{输出:}}
 
-%\numberwithin{equation}{section}
-%\numberwithin{figure}{section}
-%\numberwithin{table}{section}
-\newcommand{\red}[1]{\textcolor{red}{#1}}
-\newcommand{\blue}[1]{\textcolor{blue}{#1}}
+% %\numberwithin{equation}{section}
+% %\numberwithin{figure}{section}
+% %\numberwithin{table}{section}
+% \newcommand{\red}[1]{\textcolor{red}{#1}}
+% \newcommand{\blue}[1]{\textcolor{blue}{#1}}
+
+% 新版的算法与定理有关宏包与命令
+% \usepackage[ruled,vlined]{algorithm2e}  % 支持跨页的算法宏包
 
 
 %===================== 建模论文题目 ======================
@@ -81,43 +85,44 @@
 \begin{document}
 
  %生成标题
-\maketitle
+% \maketitle
 
  %填写摘要
-\begin{abstract}
+% \begin{abstract}
 
-本研究针对无线局域网（WLAN）在同频组网环境中的性能挑战，特别是同频干扰或共信道干扰（CCI）对网络性能的影响，提出了基于实测数据的特征构建和分析方法，进一步训练Stacking集成学习模型，实现了对WLAN系统吞吐量的精确预测，克服了传统仿真模型在实际部署中的局限性。
+% 本研究针对无线局域网（WLAN）在同频组网环境中的性能挑战，特别是同频干扰或共信道干扰（CCI）对网络性能的影响，提出了基于实测数据的特征构建和分析方法，进一步训练Stacking集成学习模型，实现了对WLAN系统吞吐量的精确预测，克服了传统仿真模型在实际部署中的局限性。
 
 
-针对问题一，首先对\textbf{数据预处理}，选取合适的参数作为特征值进行\textbf{相关性分析}。本文发现RSSI相关参数对AP发送机会具有较高影响但特征维度较大，因此基于RSSI，进一步构建\textbf{信干噪比（SINR）}和\textbf{信号质量（Sq）}两类指标实现降维。同时，结合强弱影响排序，选取\textbf{5类特征值}（在训练集中变量名为：SINR、protocol、sq、per和eirp），构建\textbf{Stacking集成学习}模型。通过交叉验证和网格搜索，获取最优化参数。最终，2个AP测试集上的R\textsuperscript{2}为\textbf{0.98}，均方根误差仅为\textbf{1.45}；3个AP测试集上的R\textsuperscript{2}为\textbf{0.94}，均方根误差仅为\textbf{2.75}。实现了对AP发送机会的高精度预测。
+% 针对问题一，首先对\textbf{数据预处理}，选取合适的参数作为特征值进行\textbf{相关性分析}。本文发现RSSI相关参数对AP发送机会具有较高影响但特征维度较大，因此基于RSSI，进一步构建\textbf{信干噪比（SINR）}和\textbf{信号质量（Sq）}两类指标实现降维。同时，结合强弱影响排序，选取\textbf{5类特征值}（在训练集中变量名为：SINR、protocol、sq、per和eirp），构建\textbf{Stacking集成学习}模型。通过交叉验证和网格搜索，获取最优化参数。最终，2个AP测试集上的R\textsuperscript{2}为\textbf{0.98}，均方根误差仅为\textbf{1.45}；3个AP测试集上的R\textsuperscript{2}为\textbf{0.94}，均方根误差仅为\textbf{2.75}。实现了对AP发送机会的高精度预测。
 
-针对问题二，考虑到MCS和NSS为分类变量，且样本比例极不均衡。结合问题一，在深入分析训练集中各参数与MCS和NSS的相关性后，发现MCS与5个变量的相关性均大于\textbf{0.5}，包括变量erip、SINR和Sq。而NSS仅与MCC有较强相关性，约为0.4。因此，本文构建了\textbf{层次预测模型}，首先预测上层目标变量MCS，将预测结果作为输入特征，进一步预测下层目标变量NSS。在进行下层预测时，考虑到NSS变量的\textbf{长尾分布特征}，提出\textbf{Kmeans聚类欠采样}和\textbf{SMOTE过采样方法}，解决样本不均衡问题。然后对模型通过交叉验证和网格搜索，获取最优化参数。最终，上层MCS测试集的Recall为\textbf{0.81}，F1分数为\textbf{0.80}；下层NSS测试集的Recall为\textbf{0.92}，F1分数为\textbf{0.92}。进一步对模型的性能评估，证实了该模型在上层特征提取和下层样本分类方面能力显著，实现了对（MCS,NSS）更优的预测结果。
+% 针对问题二，考虑到MCS和NSS为分类变量，且样本比例极不均衡。结合问题一，在深入分析训练集中各参数与MCS和NSS的相关性后，发现MCS与5个变量的相关性均大于\textbf{0.5}，包括变量erip、SINR和Sq。而NSS仅与MCC有较强相关性，约为0.4。因此，本文构建了\textbf{层次预测模型}，首先预测上层目标变量MCS，将预测结果作为输入特征，进一步预测下层目标变量NSS。在进行下层预测时，考虑到NSS变量的\textbf{长尾分布特征}，提出\textbf{Kmeans聚类欠采样}和\textbf{SMOTE过采样方法}，解决样本不均衡问题。然后对模型通过交叉验证和网格搜索，获取最优化参数。最终，上层MCS测试集的Recall为\textbf{0.81}，F1分数为\textbf{0.80}；下层NSS测试集的Recall为\textbf{0.92}，F1分数为\textbf{0.92}。进一步对模型的性能评估，证实了该模型在上层特征提取和下层样本分类方面能力显著，实现了对（MCS,NSS）更优的预测结果。
 
-针对问题三，首先分析对系统吞吐量有影响的变量，主要分析了随机回退机制，得到了$CW_{min}=6$ 下,2个AP下的随机回退时间期望,还分析了数据帧聚合机制对于吞吐量的影响,确定使用层次 stacking 预测模型，实现两次级联完成新特征对吞吐量的预测。对模型通过交叉验证和网格搜索，获取最优化参数。最终，该模型整体的R\textsuperscript{2}为\textbf{0.91}，平均绝对误差（MAE）为\textbf{11.9}。然后对模型进行评估，证实了该模型对WLAN吞吐量的高精度预测。
+% 针对问题三，首先分析对系统吞吐量有影响的变量，主要分析了随机回退机制，得到了$CW_{min}=6$ 下,2个AP下的随机回退时间期望,还分析了数据帧聚合机制对于吞吐量的影响,确定使用层次 stacking 预测模型，实现两次级联完成新特征对吞吐量的预测。对模型通过交叉验证和网格搜索，获取最优化参数。最终，该模型整体的R\textsuperscript{2}为\textbf{0.91}，平均绝对误差（MAE）为\textbf{11.9}。然后对模型进行评估，证实了该模型对WLAN吞吐量的高精度预测。
 
-\keywords{无线局域网; 吞吐量; 集成学习; 层次预测; 重采样}
+% \keywords{无线局域网; 吞吐量; 集成学习; 层次预测; 重采样}
 
-\end{abstract}
+% \end{abstract}
 
-\pagestyle{plain}
+% \pagestyle{plain}
 
-%目录 不推荐加
-\maketoc
+% %目录 不推荐加
+% \maketoc
 
-\clearpage
+% \clearpage
 
-\include{chapter1}
-\include{chapter2}
-\include{chapter3}
-\include{chapter4}
+% 分章节写，不用的暂时先注释
+% \include{chapter1}
+% \include{chapter2}
+% \include{chapter3}
+% \include{chapter4}
 \include{chapter5}
-\include{chapter6}
-\include{chapter7}
+% \include{chapter6}
+% \include{chapter7}
 
 
 
 
-% 下面的可以都不要了
+% 下面的暂时不分章节
 \section{模型的评价与改进}
 \subsection{模型的评价}
 

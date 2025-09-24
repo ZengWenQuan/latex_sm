@@ -1,6 +1,6 @@
-\documentclass[11pt,a4paper]{article}
+% 新版的算法与定理有关宏包与命令
 \usepackage[utf8]{inputenc}
-\usepackage{amsmath,amssymb,amsthm}
+\usepackage{amssymb,amsthm}
 \usepackage[ruled,vlined]{algorithm2e}  % 支持跨页的算法宏包
 \usepackage{enumitem}
 
@@ -10,9 +10,7 @@
 \newtheorem{claim}{主张}
 
 
-
 \section{问题一分析与求解}
-
 \subsection{问题一建模与复杂性分析}
 \label{subsec:problem1_analysis}
 
@@ -208,7 +206,7 @@ MPMSP已被广泛研究，并被证明是强NP难的\cite{Liu2017Memory}。其�
 下面给出本节所述的基于贪心策略的启发式调度算法的伪代码，并对其时间与空间复杂度进行精确的分析与说明。
 
 \begin{algorithm}[H]
-\caption{启发式根节点优先级计算与生成根节点调度序列}
+\caption{基于贪心策略的启发式调度算法}
 \KwIn{$DAG=(V,E)$，每个节点具有类型（\(\mathrm{ALLOC}\)/\(\mathrm{FREE}\)/\(\mathrm{OP}\)）与大小函数 $\mathrm{size}(\cdot)$；超参数集 $\{\omega_{L0},\alpha_1,\alpha_2,w_{\mathrm{size}}\}$}
 \KwOut{根节点调度序列 $\pi_{\mathrm{root}}$（即所有入度为0 的 \texttt{ALLOC} 节点按优先级排序后的序列）}
 \BlankLine
