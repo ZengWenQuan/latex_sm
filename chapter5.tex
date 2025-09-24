@@ -1,27 +1,15 @@
 \documentclass[11pt,a4paper]{article}
 \usepackage[utf8]{inputenc}
 \usepackage{amsmath,amssymb,amsthm}
-\usepackage{algorithm}
-\usepackage{algorithmic}
-\usepackage{geometry}
-\usepackage{hyperref}
-\usepackage{graphicx}
+\usepackage[ruled,vlined]{algorithm2e}  % 支持跨页的算法宏包
 \usepackage{enumitem}
-\usepackage{booktabs}
-\usepackage{ctex}
-\geometry{left=3cm,right=3cm,top=2.5cm,bottom=2.5cm}
 
 \newtheorem{theorem}{定理}
 \newtheorem{lemma}{引理}
 \newtheorem{definition}{定义}
 \newtheorem{claim}{主张}
 
-\title{问题一：分析与求解}
-\author{（作者）}
-\date{}
 
-\begin{document}
-\maketitle
 
 \section{问题一分析与求解}
 
@@ -32,13 +20,13 @@
 
 该问题可抽象为一个带资源约束的拓拓扑排序优化问题，其目标函数为调度序列执行过程中的最大瞬时缓存占用量。我们首先通过归约方法证明该问题是NP难的，继而提出一种基于贪心策略与反向拓扑传播优先级评估的启发式调度算法，以在多项式时间内获得高质量近似解。
 
-\subsubsection{最小峰值内存调度问题（Minimum Peak Memory Scheduling Problem）}
+\subsubsection{最小峰值缓存调度问题（Minimum Peak Memory Scheduling Problem）}
 \label{subsubsec:min_peak_problem}
 
-最小峰值内存调度问题（MPMSP）是调度理论中的经典NP难问题，其定义如下：
+最小峰值缓存调度问题（MPMSP）是调度理论中的经典NP难问题，其定义如下：
 
-\begin{definition}[最小峰值内存调度问题]
-给定一个DAG $ G = (V, E) $，其中每个节点 $ v \in V $ 关联一个内存需求 $ s(v) \in \mathbb{N}^+ $（若为ALLOC节点）或内存释放量 $ -s(v) $（若为FREE节点），目标是寻找一个拓扑排序 $ \pi: V \to \{1, 2, \dots, |V|\} $，使得执行序列中任意时刻的累计内存占用量最大值最小化：
+\begin{definition}[最小峰值缓存调度问题]
+给定一个DAG $ G = (V, E) $，其中每个节点 $ v \in V $ 关联一个缓存需求 $ s(v) \in \mathbb{N}^+ $（若为ALLOC节点）或缓存释放量 $ -s(v) $（若为FREE节点），目标是寻找一个拓扑排序 $ \pi: V \to \{1, 2, \dots, |V|\} $，使得执行序列中任意时刻的累计缓存占用量最大值最小化：
 \[
 \min_{\pi \in \text{Topo}(G)} \max_{1 \leq k \leq |V|} \left| \sum_{i=1}^{k} \Delta m(\pi(i)) \right|
 \]
@@ -48,7 +36,7 @@
 \end{cases} $，且 $ \text{Topo}(G) $ 表示所有满足DAG拓扑序的排列集合。
 \end{definition}
 
-MPMSP已被广泛研究，并被证明是强NP难的\cite{Liu2017Memory}。其难点在于节点调度顺序直接影响内存生命周期重叠程度，而最优调度需全局协调所有资源分配与释放时机。
+MPMSP已被广泛研究，并被证明是强NP难的\cite{Liu2017Memory}。其难点在于节点调度顺序直接影响缓存生命周期重叠程度，而最优调度需全局协调所有资源分配与释放时机。
 
 \subsubsection{问题一的NP难性证明}
 \label{subsubsec:reduction}
@@ -60,7 +48,7 @@ MPMSP已被广泛研究，并被证明是强NP难的\cite{Liu2017Memory}。其�
 \end{theorem}
 
 \begin{proof}
-设存在一个MPMSP实例 $ I = (G, s) $，其中 $ G = (V, E) $ 为DAG，$ s: V \to \mathbb{N}^+ $ 为内存需求函数。我们构造一个对应的本问题实例 $ I' $ 如下：
+设存在一个MPMSP实例 $ I = (G, s) $，其中 $ G = (V, E) $ 为DAG，$ s: V \to \mathbb{N}^+ $ 为缓存需求函数。我们构造一个对应的本问题实例 $ I' $ 如下：
 
 \begin{itemize}
     \item 对每个节点 $ v \in V $，在 $ I' $ 中创建两个节点：一个ALLOC节点 $ a_v $ 和一个FREE节点 $ f_v $。
@@ -73,29 +61,33 @@ MPMSP已被广泛研究，并被证明是强NP难的\cite{Liu2017Memory}。其�
 
 \subsection{基于贪心策略的启发式调度算法}
 \label{subsec:heuristic_algorithm}
+
 由于问题一的NP难特性，我们设计了一种高效的启发式算法，旨在多项式时间内生成高质量的近似解。该算法的核心思想是采用一种贪心策略，通过为所有无前驱依赖的ALLOC根节点计算优先级分数，从而确定一个优化的初始调度序列。其设计原则总结如下：
+
 \begin{enumerate}[noitemsep]
-  \item 保证产生的序列满足 DAG 的拓扑约束（即任何时刻只能选择所有前驱已调度的“就绪”节点进行调度）。
-  \item 就绪节点之间采用分层优先级：优先调度能释放大量空间的 \(\mathrm{FREE}\) 节点，其次为普通操作节点（\(\mathrm{OP}\)），最后考虑 \(\mathrm{ALLOC}\) 节点，从而尽可能在早期降低当前驻留内存。
-  \item 对 \(\mathrm{ALLOC}\) 节点采用精细化优先级：优先调度能最快降低未来内存压力的\(\mathrm{ALLOC}\) 节点。这一决策基于一个反向拓扑传播的评分模型，该模型从图的叶子节点（\(\mathrm{FREE}\)节点）出发，将未来可释放的内存量作为“收益”反向拓扑传播至图的根节点（\(\mathrm{ALLOC}\) 节点）。
-  \item 在 L0 类型（L0A/L0B/L0C）互斥约束下，采用计数器维护当前已分配 L0 类型资源并对待调度的 \(\mathrm{ALLOC}\) 节点进行阻塞与快速唤醒（使用双指针以实现批量或连续唤醒的低开销）。
+  \item 为保证产生的序列满足 DAG 的拓扑约束，我们将所有入度为0（所有前驱已调度）的节点作为就绪节点，任何时刻只选择就绪节点进行调度。所以初始时刻所有 \(\mathrm{ALLOC}\)节点作为根节点一定处于就绪状态。
+  \item 就绪节点之间分类并采用不同的优先级：就绪节点可以分为三类，\(\mathrm{FREE}\)（释放缓存节点）、\(\mathrm{OP}\)（操作节点）和\(\mathrm{ALLOC}\)（缓存分配节点）。我们基于贪心策略对就绪节点队列就行调度，优先调度\(\mathrm{FREE}\) 节点，其次为普通操作节点（\(\mathrm{OP}\)），最后考虑 \(\mathrm{ALLOC}\) 节点，从而尽可能降低当前驻留缓存的峰值。
+  \item 对\(\mathrm{ALLOC}\) 节点进一步计算类内优先级：
+%   由于\(\mathrm{FREE}\)节点与\(\mathrm{OP}\)节点一旦可调度，我们的贪心策略就会尽早将其调度，所以这两类节点的调度顺序对降低未来驻留缓存的峰值没有影响。而初始时\(\mathrm{ALLOC}\)节点作为根节点一定时刻处于就绪状态，
+  \(\mathrm{ALLOC}\)节点的调度顺序将影响下游节点的调度顺序与死锁发生的可能性，所以我们设计了一种算法按照能最快降低未来缓存峰值能力的大小来计算\(\mathrm{ALLOC}\) 节点间的调度优先级。这一算法基于一个反向拓扑传播的评分模型，该模型从图的叶子节点（\(\mathrm{FREE}\)节点）出发，将未来可释放的缓存量作为“收益”反向拓扑传播至图的根节点（\(\mathrm{ALLOC}\) 节点）。
+  \item L0 类型节点的互斥约束：在 L0 类型缓存（L0A/L0B/L0C）互斥约束下， 我们采用互斥锁维护当前已分配 L0 类型资源实现对待调度的 \(\mathrm{ALLOC}\) 节点进行阻塞与快速唤醒，并使用双指针降低调度与唤醒的开销。
 \end{enumerate}
 
 \subsubsection{针对L0互斥约束的优先级策略}
 为了处理L0缓存的互斥约束，算法首先将所有ALLOC根节点划分为两个独立的优先级组：
-\begin{itemize}
+\begin{itemize}[noitemsep]
     \item \textbf{L0组 ($R_{L0}$)}：所有在L0A, L0B, L0C缓存上分配空间的ALLOC节点。
     \item \textbf{非L0组 ($R_{\neg L0}$)}：所有在L1, UB等其他缓存上分配空间的ALLOC节点。
 \end{itemize}
 初始阶段时认为L0组的节点拥有绝对优先级，即所有L0组的节点必须在任何非L0组的节点之前被调度。这一策略旨在尽早处理具有严格互斥约束的L0资源，以最大程度地降低因资源竞争而引发死锁的可能性。
 
 \subsubsection{组内优先级评估模型}
-在每个优先级组内部，节点的相对顺序由一个精细的评分系统决定。我们设计了两个独立的分数，$S_1$和$S_2$，分别用于$R_{\neg L0}$组和$R_{L0}$组的内部排序。
+在每个优先级组内部，节点的相对顺序由一个精细的评分系统决定，评分的大小反应了该节点释放资源的潜力。我们设计了两个独立的分数，$S_1$和$S_2$，分别用于$R_{\neg L0}$组和$R_{L0}$组的内部排序。
 
 \paragraph{Score1 ($S_1$)：非L0组的优先级分数}
-$S_1$分数旨在量化一个ALLOC节点在未来能够“解锁”的内存释放总量。
-\begin{itemize}
-    \item \textbf{分数初始化}：对于图中的每个叶子节点（FREE节点）$l$，其初始分数$S_1(l)$定义为其释放的内存大小的负值。为了激励尽早释放L0缓存，我们引入权重$\omega_{L0} > 1$（本研究中取$\omega_{L0}=3$）。
+\quad \quad $S_1$分数旨在量化一个ALLOC节点在未来能够“解锁”的缓存释放总量。
+\begin{itemize}[noitemsep]
+    \item \textbf{分数初始化}：对于图中的每个叶子节点（FREE节点）$l$，其初始分数$S_1(l)$定义为其释放的缓存大小的负值。为了激励尽早释放L0缓存，我们引入权重$\omega_{L0} > 1$，来放大L0类型叶子节点的初始分数绝对值，从而提高释放L0缓存的叶子节点优先级。
     \[
     S_1(l) = \begin{cases} 
     -\omega_{L0} \cdot \text{size}(l) & \text{if } l \text{ frees an L0 buffer} \\
@@ -106,101 +98,210 @@ $S_1$分数旨在量化一个ALLOC节点在未来能够“解锁”的内存释�
     \[
     S_1(p) \leftarrow S_1(p) + \alpha_1 \cdot S_1(v)
     \]
-    其中，传播因子$\alpha_1=1$。最终，每个根节点$r$的$S_1(r)$值表示其所有下游路径可释放的内存总量的加权和。$S_1$值越小（即负得越多），表示其下游可释放的内存越多，优先级越高。
+    其中，传播因子$\alpha_1=1$。最终，每个根节点$r$的$S_1(r)$值表示其所有下游路径可释放的缓存总量的加权和。$S_1$值越小（即绝对值越大），表示其下游可释放的缓存越多，优先级越高。
 \end{itemize}
 
 \paragraph{Score2 ($S_2$)：L0组的优先级分数}
-$S_2$分数的设计目标是评估一个L0 ALLOC节点下游的拓扑结构复杂度，优先处理分支较多的节点以避免死锁。
+\quad \quad $S_2$分数的设计目标是评估一个L0类型的ALLOC节点下游的拓扑结构复杂度，优先处理分支较多的节点以避免死锁。
 \begin{itemize}
-    \item \textbf{分数初始化}：$S_2$的计算忽略L0缓存的释放量，仅关注拓扑结构。
+    \item \textbf{分数初始化}：$S_2$的初始值与$S_1$相同，这意味着，无论是L0组还是非L0组，我们都鼓励尽早释放L0缓存，从而降低因互斥竞争而引发死锁的可能性，这满足题目对L0资源尽早释放的要求。
     \[
-    S_2(l) = \begin{cases} 
-    0 & \text{if } l \text{ frees an L0 buffer} \\
+    S_1(l) = \begin{cases} 
+    -\omega_{L0} \cdot \text{size}(l) & \text{if } l \text{ frees an L0 buffer} \\
     -\text{size}(l) & \text{otherwise}
     \end{cases}
     \]
-    \item \textbf{分数传播}：传播规则为：
+    \item \textbf{分数传播}：$S_2$的传播规则与$S_1$分数的传播规则是不同的，具体为：
     \[
     S_2(p) \leftarrow S_2(p) + (1 + \alpha_2 \cdot S_2(v))
     \]
-    其中，传播因子$\alpha_2$通常是一个较小值，这意味着，首先根据分支 $\alpha_2 \cdot S_2(v)$项仅在两个ALLOC节点分支数量相近的情况下才起主要作用。公式简化为$S_2(p) \leftarrow S_2(p) + 1$。这意味着，一个节点的$S_2$分数近似等于其下游的路径分支数量。$S_2$值越大，代表其下游拓扑结构越复杂。
+    其中，传播因子$\alpha_2$通常被设置为一个较小值，此时$\alpha_2 \cdot S_2(v)$项将远小于1，公式近似简化为$S_2(p) \leftarrow S_2(p) + 1$，这意味着，一个节点的$S_2$分数近似等于其下游的路径分支数量。而当节点下游路径分支数量相近时，$\alpha_2 \cdot S_2(v)$项将起到决定性作用，代表着此时其下游可释放缓存的多少将成为主要依据。通过调整$\alpha_2$的大小，我们就可以平衡这两项之间的关系。总体的说，$S_2$值越大，代表其下游拓扑结构越复杂，优先级越高。
 \end{itemize}
 
 \subsubsection{最终调度序列生成}
-获得原始分数后，我们通过归一化和加权求和来计算每个根节点的最终总分。
+获得原始分数后，我们将其与ALLOC节点本身申请分配缓存的大小一同进行归一化与加权求和来计算每个根节点的最终总分，以此进行排序确定ALLOC节点的调度优先级。
 \begin{enumerate}
-    \item \textbf{分数归一化}：对所有根节点$r \in R = R_{L0} \cup R_{\neg L0}$，分别对$S_1(r), S_2(r)$以及节点申请的内存大小$\text{size}(r)$进行最小-最大归一化，映射到$[0, 1]$区间。
+    \item \textbf{分数归一化}：对所有根节点$r \in R = R_{L0} \cup R_{\neg L0}$，分别对$S_1(r), S_2(r)$以及节点申请的缓存大小$\text{size}(r)$进行最小-最大归一化，映射到$[0, 1]$区间。
     \[
     \text{norm}(x) = \frac{x - \min(X)}{\max(X) - \min(X)}
     \]
-    \item \textbf{总分计算}：
+    \item \textbf{总分计算}：我们对分数项与节点大小项进行加权计算总分。
     \begin{align*}
     S_{\text{total},1}(r) &= \text{norm}(S_1(r)) + w_{\text{size}} \cdot \text{norm}(\text{size}(r)) \quad (\text{for } r \in R_{\neg L0}) \\
     S_{\text{total},2}(r) &= \text{norm}(S_2(r)) + w_{\text{size}} \cdot \text{norm}(\text{size}(r)) \quad (\text{for } r \in R_{L0})
     \end{align*}
-    其中$w_{\text{size}}$是一个极小的权重（本研究中取$10^{-10}$），使得节点大小仅作为次要的排序依据。
-    \item \textbf{排序与合并}：
+    其中权重$w_{\text{size}}$用于调整分数项与$\text{size}(r)$在最终评分中的比例，通常我们将其设置为较小值，使得节点大小仅作为次要的排序依据，鼓励调度时更关注该节点释放资源的潜力。
+    \item \textbf{排序与合并}：最终，我们分别对两组节点根据总分大小进行排序，总分越高的组内的节点优先级越高。
     \begin{itemize}
         \item $R_{\neg L0}$组根据$S_{\text{total},1}$升序排序。
         \item $R_{L0}$组根据$S_{\text{total},2}$升序排序。
     \end{itemize}
-    最终的根节点调度序列$\pi_{\text{root}}$由排序后的$R_{L0}$组和$R_{\neg L0}$组顺序拼接而成。
+    最终的根节点调度序列$\pi_{\text{root}}$由排序后的$R_{L0}$组和$R_{\neg L0}$组顺序拼接而成，代表着我们始终优先调度$R_{L0}$组节点，避免因互斥约束导致死锁。
 \end{enumerate}
 
+% \subsubsection{算法伪代码与复杂度分析}
+
+% \begin{algorithm}[H]
+% \caption{基于贪心策略的启发式调度算法}
+% \KwIn{有向无环图 $G=(V, E)$}
+% \KwOut{根节点调度序列 $\pi_{\text{root}}$}
+
+% \SetKwFunction{CalculateScore}
+
+% \CalculateScore{$G$, score\_type}{%
+%     初始化所有节点的 $score \gets 0$\;
+%     $Q \gets$ 图 $G$ 中所有出度为0的节点（叶子节点）\;
+%     \ForEach{$l \in Q$}{
+%         \eIf{score\_type = 1}{
+%             根据 $S_1$ 规则初始化 $l.score$\;
+%         }{
+%             根据 $S_2$ 规则初始化 $l.score$\;
+%         }
+%     }
+%     \While{$Q$ 非空}{
+%         $v \gets Q.\text{popleft()}$\;
+%         \ForEach{$p \in Parents(v)$}{
+%             \eIf{score\_type = 1}{
+%                 $p.score \gets p.score + \alpha_1 \cdot v.score$\;
+%             }{
+%                 $p.score \gets p.score + (1 + \alpha_2 \cdot v.score)$\;
+%             }
+%             $p.out\_degree \gets p.out\_degree - 1$\;
+%             \If{$p.out\_degree = 0$}{
+%                 $Q.\text{append}(p)$\;
+%             }
+%         }
+%     }
+% }
+
+% \vspace{1ex}
+% \textbf{主流程:}\;
+% $S_1 \gets$ \CalculateScore{$G$, 1}\;
+% $S_2 \gets$ \CalculateScore{$G$, 2}\;
+
+% $R \gets$ 图 $G$ 中所有入度为0的 ALLOC 节点（根节点）\;
+% $R_{L0} \gets \{r \in R \mid r.\text{type} \in \{\texttt{L0A}, \texttt{L0B}, \texttt{L0C}\}\}$\;
+% $R_{\neg L0} \gets R \setminus R_{L0}$\;
+
+% 对 $R$ 中节点的 $S_1, S_2, size$ 进行归一化\;
+% 为 $R_{L0}$ 中每个节点计算 $S_{\text{total},2}$\;
+% 为 $R_{\neg L0}$ 中每个节点计算 $S_{\text{total},1}$\;
+
+% 对 $R_{L0}$ 按 $S_{\text{total},2}$ 升序排序\;
+% 对 $R_{\neg L0}$ 按 $S_{\text{total},1}$ 升序排序\;
+
+% $\pi_{\text{root}} \gets \text{concatenate}(R_{L0}, R_{\neg L0})$\;
+% \Return $\pi_{\text{root}}$\;
+
+% \end{algorithm}
+
+% \clearpage
+% \paragraph{复杂度分析}
+% \quad \quad 该算法的主要计算开销在于分数计算过程。`CalculateScore`函数本质上是对图进行一次反向拓扑遍历，其时间复杂度为$O(|V| + |E|)$，其中$|V|$是节点数，$|E|$是边数。该过程执行两次。后续的根节点分组、归一化和排序步骤的时间复杂度为$O(|R|\log|R|)$，其中$|R|$是根节点的数量。由于$|R| \leq |V|$，算法的整体时间复杂度由图遍历主导，为$O(|V| + |E|)$，能够在多项式时间内为大规模计算图生成高质量的调度序列。
+
+
+
+
 \subsubsection{算法伪代码与复杂度分析}
-算法的整体流程如算法\ref{alg:schedule}所示。
+\label{subsubsec:algorithm_pseudocode_complexity}
 
-\begin{algorithm}
-\caption{启发式调度算法}
-\label{alg:schedule}
-\begin{algorithmic}[1]
-\STATE \textbf{Input:} 有向无环图 $G=(V, E)$
-\STATE \textbf{Output:} 根节点调度序列 $\pi_{\text{root}}$
+下面给出本节所述的基于贪心策略的启发式调度算法的伪代码，并对其时间与空间复杂度进行精确的分析与说明。
 
-\FUNCTION{CalculateScore}{$G$, score\_type}
-    \STATE 初始化所有节点的score为0
-    \STATE $Q \leftarrow$ 图$G$中所有出度为0的节点（叶子节点）
-    \FOR{$l$ in $Q$}
-        \IF{score\_type is 1}
-            \STATE 根据$S_1$规则初始化$l.score$
-        \ELSE
-            \STATE 根据$S_2$规则初始化$l.score$
-        \ENDIF
-    \ENDFOR
-    \WHILE{$Q$ is not empty}
-        \STATE $v \leftarrow Q.popleft()$
-        \FOR{$p$ in Parents($v$)}
-            \IF{score\_type is 1}
-                \STATE $p.score \leftarrow p.score + \alpha_1 \cdot v.score$
-            \ELSE
-                \STATE $p.score \leftarrow p.score + (1 + \alpha_2 \cdot v.score)$
-            \ENDIF
-            \STATE $p.out\_degree \leftarrow p.out\_degree - 1$
-            \IF{$p.out\_degree = 0$}
-                \STATE $Q.append(p)$
-            \ENDIF
-        \ENDFOR
-    \ENDWHILE
-\ENDFUNCTION
+\begin{algorithm}[H]
+\caption{启发式根节点优先级计算与生成根节点调度序列}
+\KwIn{$DAG=(V,E)$，每个节点具有类型（\(\mathrm{ALLOC}\)/\(\mathrm{FREE}\)/\(\mathrm{OP}\)）与大小函数 $\mathrm{size}(\cdot)$；超参数集 $\{\omega_{L0},\alpha_1,\alpha_2,w_{\mathrm{size}}\}$}
+\KwOut{根节点调度序列 $\pi_{\mathrm{root}}$（即所有入度为0 的 \texttt{ALLOC} 节点按优先级排序后的序列）}
+\BlankLine
 
-\STATE
-\STATE // 主流程
-\STATE $S_1 \leftarrow$ CalculateScore($G$, 1)
-\STATE $S_2 \leftarrow$ CalculateScore($G$, 2)
-\STATE $R \leftarrow$ 图$G$中所有入度为0的ALLOC节点（根节点）
-\STATE $R_{L0} \leftarrow \{r \in R \mid r.\text{type} \in \{\'L0A\', \'L0B\', \'L0C\'\}\}$
-\STATE $R_{\neg L0} \leftarrow R \setminus R_{L0}$
-\STATE 对$R$中节点的$S_1, S_2, \text{size}$进行归一化
-\STATE 为$R_{L0}$中每个节点计算$S_{\text{total},2}$
-\STATE 为$R_{\neg L0}$中每个节点计算$S_{\text{total},1}$
-\STATE Sort $R_{L0}$ in ascending order of $S_{\text{total},2}$
-\STATE Sort $R_{\neg L0}$ in ascending order of $S_{\text{total},1}$
-\STATE $\pi_{\text{root}} \leftarrow \text{concatenate}(R_{L0}, R_{\neg L0})$
-\STATE \textbf{return} $\pi_{	ext{root}}$
-\end{algorithmic}
+\SetKwFunction{CalcScore}{CalculateScore}
+\SetKwProg{Fn}{函数}{:}{}
+\Fn{\CalcScore{$G$, scoreType}}{
+    % 初始化
+    对所有节点 $v\in V$ 初始化 $\mathrm{score}_v \leftarrow 0$，记录当前出度 $d^{\mathrm{out}}_v \leftarrow \deg^{\mathrm{out}}(v)$\;
+    初始化队列 $Q \leftarrow \{\,\ell\in V \mid d^{\mathrm{out}}_\ell = 0\,\}$（所有叶子节点）\;
+    \ForEach{$\ell\in Q$}{
+        \eIf{scoreType == 1}{
+            \tcp*{按 $S_1$ 规则初始化叶子节点分数（释放量为负值，释放 L0 时放大）}
+            \If{$\ell$ 为 FREE 且 释放 L0 缓冲区}{
+                $\mathrm{score}_\ell \leftarrow -\omega_{L0}\cdot \mathrm{size}(\ell)$\;
+            } \Else {
+                $\mathrm{score}_\ell \leftarrow -\mathrm{size}(\ell)$\;
+            }
+        }{
+            \tcp*{按 $S_2$ 规则初始化（初值与 $S_1$ 相同，可在应用中调整）}
+            \If{$\ell$ 为 FREE 且 释放 L0 缓冲区}{
+                $\mathrm{score}_\ell \leftarrow -\omega_{L0}\cdot \mathrm{size}(\ell)$\;
+            } \Else {
+                $\mathrm{score}_\ell \leftarrow -\mathrm{size}(\ell)$\;
+            }
+        }
+    }
+    % 反向拓扑传播
+    \While{$Q$ 非空}{
+        取出 $v \leftarrow Q.\text{popleft}()$\;
+        \ForEach{$p$ 属于 Parents$(v)$}{
+            \If{scoreType == 1}{
+                $\mathrm{score}_p \leftarrow \mathrm{score}_p + \alpha_1 \cdot \mathrm{score}_v$\;
+            } \Else {
+                $\mathrm{score}_p \leftarrow \mathrm{score}_p + \big(1 + \alpha_2 \cdot \mathrm{score}_v\big)$\;
+            }
+            $d^{\mathrm{out}}_p \leftarrow d^{\mathrm{out}}_p - 1$\;
+            \If{$d^{\mathrm{out}}_p = 0$}{
+                $Q.\text{append}(p)$\;
+            }
+        }
+    }
+    \Return $\{\mathrm{score}_v\}_{v\in V}$\;
+}
+\vspace{1ex}
+
+% 主流程
+$S_1 \leftarrow$ \CalcScore{$G$, 1}\;
+$S_2 \leftarrow$ \CalcScore{$G$, 2}\;
+
+$R \leftarrow \{\,r\in V \mid r.\text{type}=\texttt{ALLOC} \ \wedge\ \deg^{\mathrm{in}}(r)=0\,\}$\;
+$R_{L0} \leftarrow \{\,r\in R \mid r.\text{bufType}\in\{\texttt{L0A},\texttt{L0B},\texttt{L0C}\}\,\}$\;
+$R_{\neg L0} \leftarrow R \setminus R_{L0}$\;
+
+% 归一化与总分计算
+\tcp{对 $R$ 内的值做 min-max 归一化，归一化时在分母加上微小常数 $\varepsilon$ 以保证数值稳定性}
+定义函数 $\mathrm{norm}(x;X) = \dfrac{x-\min(X)}{\max(X)-\min(X)+\varepsilon}$，其中 $X$ 为对应的值集合，$\varepsilon>0$ 很小。\;
+
+\ForEach{$r\in R_{\neg L0}$}{
+    $S_{\mathrm{total},1}(r) \leftarrow \mathrm{norm}\big(S_1(r); \{S_1(t)\}_{t\in R}\big) \;+\; w_{\mathrm{size}}\cdot \mathrm{norm}\big(\mathrm{size}(r);\{\mathrm{size}(t)\}_{t\in R}\big)$\;
+}
+\ForEach{$r\in R_{L0}$}{
+    $S_{\mathrm{total},2}(r) \leftarrow \mathrm{norm}\big(S_2(r); \{S_2(t)\}_{t\in R}\big) \;+\; w_{\mathrm{size}}\cdot \mathrm{norm}\big(\mathrm{size}(r);\{\mathrm{size}(t)\}_{t\in R}\big)$\;
+}
+
+% 排序与返回
+将 $R_{L0}$ 按 $S_{\mathrm{total},2}$ 升序排序；\;
+将 $R_{\neg L0}$ 按 $S_{\mathrm{total},1}$ 升序排序；\;
+
+$\pi_{\mathrm{root}} \leftarrow \text{concatenate}(R_{L0},\,R_{\neg L0})$\;
+\Return $\pi_{\mathrm{root}}$\;
 \end{algorithm}
 
-\paragraph{复杂度分析}
-该算法的主要计算开销在于分数计算过程。`CalculateScore`函数本质上是对图进行一次反向拓扑遍历，其时间复杂度为$O(|V| + |E|)$，其中$|V|$是节点数，$|E|$是边数。该过程执行两次。后续的根节点分组、归一化和排序步骤的时间复杂度为$O(|R|\log|R|)$，其中$|R|$是根节点的数量。由于$|R| \leq |V|$，算法的整体时间复杂度由图遍历主导，为$O(|V| + |E|)$，能够在多项式时间内为大规模计算图生成高质量的调度序列。
 
-\end{document}
+
+\paragraph{时间复杂度分析}
+\begin{itemize}[noitemsep]
+  \item \textbf{CalculateScore（一次反向拓扑遍历）}：对每个节点和每条边进行常数次操作，时间为 $O(|V|+|E|)$。算法中分别计算 $S_1$ 与 $S_2$，因此该部分总计 $2\cdot O(|V|+|E|)=O(|V|+|E|)$（常数因子可忽略）。
+  \item \textbf{根节点构造与分组}：一次线性扫描，时间 $O(|V|)$。
+  \item \textbf{归一化}：对根节点集合 $R$ 做 min/max 计算与线性变换，时间 $O(|R|)$。
+  \item \textbf{组内排序}：对 $R_{L0}$ 与 $R_{\neg L0}$ 进行排序，总时间为 $O(|R_{L0}|\log|R_{L0}|+|R_{\neg L0}|\log|R_{\neg L0}|)=O(|R|\log|R|)$。
+\end{itemize}
+因此总复杂度为
+\[
+O(|V|+|E|) + O(|R|\log|R|).
+\]
+在稀疏图（通常 $|E|=O(|V|)$）且 $|R|\ll |V|$ 的常见情形下，前项为主导，算法呈线性时间级别。在极端情形（$|R|\approx |V|$）下，整体可界为 $O(|V|\log|V| + |E|)$。
+
+\paragraph{空间复杂度分析}
+\begin{itemize}[noitemsep]
+  \item 图的邻接表表示需要 $O(|V|+|E|)$ 空间。
+  \item 用于存放分数、出度、队列等临时结构需要 $O(|V|)$ 空间。
+\end{itemize}
+总体空间复杂度为 $O(|V|+|E|)$。
+
+本节所给伪代码与分析在保持多项式时间复杂度的前提下，明确了实现细节与数值稳定性处理。该方法在实践中通常能为根节点生成能够有效降低峰值缓存占用的优先级序列，并为运行时的完整调度提供可靠的启发式引导。
